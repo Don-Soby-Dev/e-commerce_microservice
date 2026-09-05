@@ -10,22 +10,30 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-j++mi!shz$eu&p1j9s0i5a1&cic_68dshq5_4^g#-_*=lqq-qs"
+SECRET_KEY = os.getenv("SECRET_KEY")  # pyright: ignore[reportUndefinedVariable]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = (
+    os.getenv("DEBUG", "False") == "True"
+)  # pyright: ignore[reportUndefinedVariable]
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(
+    ","
+)  # pyright: ignore[reportUndefinedVariable]
 
 
 # Application definition
@@ -129,4 +137,6 @@ MAILERS = {
 }
 
 # Product Service URL for inter-service communication
-PRODUCT_SERVICE_URL = os.environ.get("PRODUCT_SERVICE_URL", "http://localhost:8001")
+PRODUCT_SERVICE_URL = os.getenv(
+    "PRODUCT_SERVICE_URL", "http://localhost:8001"
+)  # pyright: ignore[reportUndefinedVariable]
