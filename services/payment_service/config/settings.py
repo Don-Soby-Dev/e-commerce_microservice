@@ -11,11 +11,12 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
-from pathlib import Path
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -41,8 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
-    "orders",
+    "payments",
 ]
 
 MIDDLEWARE = [
@@ -131,6 +131,3 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
-
-# Product Service URL for inter-service communication
-PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://localhost:8001")
