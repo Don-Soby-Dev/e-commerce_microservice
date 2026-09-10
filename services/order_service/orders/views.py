@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from .models import Order, OrderItem
 from .serializers import OrderSerializer
 from services.product_client import ProductServiceClient
+from services.payment_client import PaymentTransaction
 from .utils import validate_order_products, deduct_product_stock, inject_product_stock
 
 
@@ -42,6 +43,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             total_amount=total_amount,
         )
 
+        res = PaymentTransaction(user_id, order.id, int(total_amount))
+        print(
+            "Payment is processd and it is : ", res.success, "on : ", res.transaction_id
+        )
+        if not res.success:
+            order.delete()
+            return Response(res.message, status=status.HTTP_400_BAD_REQUEST)
+
         deducted_items = []
         for item in processed_items:
             OrderItem.objects.create(
@@ -66,7 +75,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     )
                 order.delete()
                 return Response(error, status=status.HTTP_400_BAD_REQUEST)
-            
+
             deducted_items.append(item)
 
         output_serializer = self.get_serializer(order)

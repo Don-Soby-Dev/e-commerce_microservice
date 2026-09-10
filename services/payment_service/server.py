@@ -9,8 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 print(BASE_DIR)
 sys.path.append(str(BASE_DIR / "protos"))
 
-import payment_pb2
-import payment_pb2_grpc
+import payment_pb2  # pyright: ignore[reportMissingImports]
+import payment_pb2_grpc  # pyright: ignore[reportMissingImports]
 
 
 class PaymentServicer(payment_pb2_grpc.PaymentServiceServicer):
@@ -34,8 +34,8 @@ class PaymentServicer(payment_pb2_grpc.PaymentServiceServicer):
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    payment_pb2_grpc.add_PymentServiceServicer_to_server(PaymentServicer(), server)
-    server.add_insecure_port("[::]:50051")
+    payment_pb2_grpc.add_PaymentServiceServicer_to_server(PaymentServicer(), server)
+    server.add_insecure_port("localhost:50051")
     print("gRPC payment Service running on port 50051...")
     server.start()
     server.wait_for_termination()
