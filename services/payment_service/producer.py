@@ -2,7 +2,7 @@ import json
 import pika
 
 
-def publish_payment_success_even(order_id, user_id, amount):
+def publish_payment_success_event(order_id, user_id, amount):
 
     connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
 

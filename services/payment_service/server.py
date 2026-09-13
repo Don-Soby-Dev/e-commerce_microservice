@@ -11,6 +11,7 @@ sys.path.append(str(BASE_DIR / "protos"))
 
 import payment_pb2  # pyright: ignore[reportMissingImports]
 import payment_pb2_grpc  # pyright: ignore[reportMissingImports]
+from producer import publish_payment_success_event
 
 
 class PaymentServicer(payment_pb2_grpc.PaymentServiceServicer):
@@ -27,6 +28,11 @@ class PaymentServicer(payment_pb2_grpc.PaymentServiceServicer):
             )
 
         tx_id = f"tx_{uuid.uuid4().hex[:10]}"
+        publish_payment_success_event(
+            request.order_id,
+            request.user_id,
+            request.amount,
+        )
         return payment_pb2.PaymentResponse(
             success=True, transaction_id=tx_id, message=""
         )
