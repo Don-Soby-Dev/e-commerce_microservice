@@ -159,3 +159,5 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
     "JTI_CLAIM": "jti",
 }
+
+APPEND_SLASH = False
