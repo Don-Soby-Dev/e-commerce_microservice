@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "apis",
+    "rest_framework",
 ]
 
 MIDDLEWARE = [
@@ -128,3 +129,5 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8002/api/auth/")

@@ -23,3 +23,7 @@ staticfiles/
 
 # OS
 .DS_Store
+
+#certs
+*.pem
+certs/
