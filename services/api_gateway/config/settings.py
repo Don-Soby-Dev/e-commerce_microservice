@@ -130,5 +130,9 @@ MAILERS = {
     },
 }
 
+JWKS_SERVING_URL = os.getenv(
+    "JWKS_SERVING_URL", "http://localhost:8002/.well-known/jwks.json"
+)
+
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8002/api/auth/")
-JWKS_SERVING_URL = os.getenv("JWKS_SERVING_URL", "http://localhost:8002/.well-known/jwks.json")
+ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://localhost:8000/api/orders/")
