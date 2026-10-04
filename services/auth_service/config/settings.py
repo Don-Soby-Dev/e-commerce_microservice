@@ -158,6 +158,7 @@ SIMPLE_JWT = {
     "VERIFYING_KEY": PUBLIC_KEY,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "JTI_CLAIM": "jti",
+    "AUTH_TOKEN_CLASSES": ("auths.tokens.CustomAccessToken",),
 }
 
 APPEND_SLASH = False

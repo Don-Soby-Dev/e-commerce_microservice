@@ -1,8 +1,9 @@
+import jwt
 from django.contrib.auth.models import User
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from rest_framework_simplejwt.tokens import RefreshToken
+
+from .tokens import CustomRefreshToken
 
 
 class AuthenticationAPITests(APITestCase):
@@ -39,6 +40,24 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(result_item["user"]["username"], "newuser")
         self.assertEqual(result_item["user"]["email"], "newuser@example.com")
         self.assertTrue(User.objects.filter(username="newuser").exists())
+
+        # Verify kid in token headers
+        access_header = jwt.get_unverified_header(result_item["access_token"])
+        refresh_header = jwt.get_unverified_header(result_item["refresh_token"])
+        self.assertEqual(access_header.get("kid"), "key-id-v1")
+        self.assertEqual(refresh_header.get("kid"), "key-id-v1")
+
+        # Verify user_id and username claims in payload
+        access_payload = jwt.decode(
+            result_item["access_token"], options={"verify_signature": False}
+        )
+        refresh_payload = jwt.decode(
+            result_item["refresh_token"], options={"verify_signature": False}
+        )
+        self.assertEqual(access_payload.get("username"), "newuser")
+        self.assertEqual(refresh_payload.get("username"), "newuser")
+        self.assertIsNotNone(access_payload.get("user_id"))
+        self.assertIsNotNone(refresh_payload.get("user_id"))
 
     def test_register_duplicate_username(self):
         payload = {
@@ -78,6 +97,24 @@ class AuthenticationAPITests(APITestCase):
         self.assertIn("access_token", result_item)
         self.assertEqual(result_item["user"]["username"], self.username)
 
+        # Verify kid in token headers
+        access_header = jwt.get_unverified_header(result_item["access_token"])
+        refresh_header = jwt.get_unverified_header(result_item["refresh_token"])
+        self.assertEqual(access_header.get("kid"), "key-id-v1")
+        self.assertEqual(refresh_header.get("kid"), "key-id-v1")
+
+        # Verify user_id and username claims in payload
+        access_payload = jwt.decode(
+            result_item["access_token"], options={"verify_signature": False}
+        )
+        refresh_payload = jwt.decode(
+            result_item["refresh_token"], options={"verify_signature": False}
+        )
+        self.assertEqual(access_payload.get("username"), self.username)
+        self.assertEqual(refresh_payload.get("username"), self.username)
+        self.assertEqual(access_payload.get("user_id"), self.user.id)
+        self.assertEqual(refresh_payload.get("user_id"), self.user.id)
+
     def test_login_invalid_password(self):
         payload = {
             "username": self.username,
@@ -112,7 +149,7 @@ class AuthenticationAPITests(APITestCase):
         self.assertFalse(data.get("success"))
 
     def test_refresh_token_success_with_refresh_token_key(self):
-        refresh = RefreshToken.for_user(self.user)
+        refresh = CustomRefreshToken.for_user(self.user)
         payload = {"refresh_token": str(refresh)}
         response = self.client.post("/refresh/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -123,14 +160,28 @@ class AuthenticationAPITests(APITestCase):
         self.assertIn("access_token", data["data"][0])
         self.assertIn("refresh_token", data["data"][0])
 
+        # Verify kid in refreshed token headers
+        access_header = jwt.get_unverified_header(data["data"][0]["access_token"])
+        self.assertEqual(access_header.get("kid"), "key-id-v1")
+
+        # Verify user_id and username claims in refreshed access token
+        access_payload = jwt.decode(
+            data["data"][0]["access_token"], options={"verify_signature": False}
+        )
+        self.assertEqual(access_payload.get("username"), self.username)
+        self.assertEqual(access_payload.get("user_id"), self.user.id)
+
     def test_refresh_token_success_with_refresh_key(self):
-        refresh = RefreshToken.for_user(self.user)
+        refresh = CustomRefreshToken.for_user(self.user)
         payload = {"refresh": str(refresh)}
         response = self.client.post("/refresh/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertTrue(data.get("success"))
         self.assertIn("access_token", data["data"][0])
+
+        access_header = jwt.get_unverified_header(data["data"][0]["access_token"])
+        self.assertEqual(access_header.get("kid"), "key-id-v1")
 
     def test_refresh_token_invalid(self):
         payload = {"refresh_token": "invalid.token.value"}
@@ -164,3 +215,32 @@ class AuthenticationAPITests(APITestCase):
         )
         self.assertEqual(reg_res.status_code, status.HTTP_201_CREATED)
         self.assertTrue(reg_res.json()["success"])
+
+    def test_endpoints_without_trailing_slash(self):
+        # Verify /login without trailing slash
+        login_res = self.client.post(
+            "/login",
+            {"username": self.username, "password": self.password},
+            format="json",
+        )
+        self.assertEqual(login_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(login_res.json()["success"])
+
+        # Verify /register without trailing slash
+        reg_res = self.client.post(
+            "/register",
+            {"username": "noslashuser", "password": "Password123!"},
+            format="json",
+        )
+        self.assertEqual(reg_res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(reg_res.json()["success"])
+
+        # Verify /refresh without trailing slash
+        refresh = CustomRefreshToken.for_user(self.user)
+        refresh_res = self.client.post(
+            "/refresh",
+            {"refresh_token": str(refresh)},
+            format="json",
+        )
+        self.assertEqual(refresh_res.status_code, status.HTTP_200_OK)
+        self.assertTrue(refresh_res.json()["success"])

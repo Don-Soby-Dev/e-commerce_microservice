@@ -3,9 +3,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.settings import api_settings
-from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 
+from .tokens import CustomRefreshToken
 from .serializers import (
     LoginSerializer,
     RefreshTokenSerializer,
@@ -17,12 +17,13 @@ from authlib.jose import JsonWebKey
 
 
 def get_tokens_for_user(user):
-    """Generate simplejwt access and refresh tokens for a user."""
-    refresh = RefreshToken.for_user(user)
+    """Generate simplejwt access and refresh tokens for a user with kid and custom claims."""
+    refresh = CustomRefreshToken.for_user(user)
     return {
         "refresh_token": str(refresh),
         "access_token": str(refresh.access_token),
     }
+
 
 
 class RegisterView(APIView):
