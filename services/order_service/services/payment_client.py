@@ -2,14 +2,18 @@ import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-print("path --> ", BASE_DIR)
-sys.path.append(str(BASE_DIR / "protos"))
+for p in [str(BASE_DIR / "protos"), "/protos"]:
+    if p not in sys.path:
+        sys.path.append(p)
 
 import grpc
 import payment_pb2
 import payment_pb2_grpc
 
-channel = grpc.insecure_channel("localhost:50051")
+import os
+
+PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "localhost:50051")
+channel = grpc.insecure_channel(PAYMENT_SERVICE_URL)
 
 stub = payment_pb2_grpc.PaymentServiceStub(channel)
 

@@ -17,9 +17,19 @@ def process_message(ch, methode, properties, body):
     ch.basic_ack(delivery_tag=methode.delivery_tag)
 
 
+import os
+
 def start_counsumer():
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
+    rabbitmq_host = os.getenv("RABBITMQ_HOST", "localhost")
+    connection = None
+    while not connection:
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(rabbitmq_host))
+        except pika.exceptions.AMQPConnectionError:
+            print(f" [*] Waiting for RabbitMQ ({rabbitmq_host}) to become available...")
+            time.sleep(2)
+
     channel = connection.channel()
 
     queue_name = "order_notification"

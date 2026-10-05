@@ -2,9 +2,12 @@ import json
 import pika
 
 
+import os
+
 def publish_payment_success_event(order_id, user_id, amount):
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
+    rabbitmq_host = os.getenv("RABBITMQ_HOST", "localhost")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(rabbitmq_host))
 
     channel = connection.channel()
 

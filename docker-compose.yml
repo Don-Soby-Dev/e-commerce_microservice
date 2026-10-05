@@ -1,0 +1,141 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+  auth_service:
+    build:
+      context: ./services/auth_service
+      dockerfile: Dockerfile
+    container_name: auth_service
+    ports:
+      - "8002:8002"
+    environment:
+      SECRET_KEY: "django-insecure-)v$$sxykalzs8pz2acd4=i!ko*49=69ehp5@e%0+rh4gqajny8&"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+  product_service:
+    build:
+      context: ./services/product_service
+      dockerfile: Dockerfile
+    container_name: product_service
+    ports:
+      - "8001:8001"
+    environment:
+      SECRET_KEY: "django-insecure-tloo#y!v!xa@5$$^ykkf07z%#c9dwu1%fed!k^u^mt%i5xhvbp4"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+  payment_service:
+    build:
+      context: ./services/payment_service
+      dockerfile: Dockerfile
+    container_name: payment_service
+    ports:
+      - "50051:50051"
+    command: [ "python", "server.py" ]
+    volumes:
+      - ./protos:/protos
+    environment:
+      SECRET_KEY: "django-insecure-#iw3s=1*6a5byt9@wgl-j^9m$$2h^nj8&6z(ox$$e95o2cw%3e*="
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+      GRPC_BIND_ADDR: "0.0.0.0:50051"
+      RABBITMQ_HOST: "rabbitmq"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+  order_service:
+    build:
+      context: ./services/order_service
+      dockerfile: Dockerfile
+    container_name: order_service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./protos:/protos
+    environment:
+      SECRET_KEY: "django-insecure-j++mi!shz$$eu&p1j9s0i5a1&cic_68dshq5_4^g#-_*=lqq-qs"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+      PRODUCT_SERVICE_URL: "http://product_service:8001"
+      PAYMENT_SERVICE_URL: "payment_service:50051"
+      RABBITMQ_HOST: "rabbitmq"
+    depends_on:
+      product_service:
+        condition: service_started
+      payment_service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+  notification_service:
+    build:
+      context: ./services/notification_service
+      dockerfile: Dockerfile
+    container_name: notification_service
+    command: [ "python", "notifications/consumer.py" ]
+    environment:
+      RABBITMQ_HOST: "rabbitmq"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: ./services/api_gateway
+      dockerfile: Dockerfile
+    container_name: api_gateway
+    ports:
+      - "8003:8003"
+    environment:
+      SECRET_KEY: "django-insecure-6*=-gqhz%&u4t4tbb8-kx+(!01bkl8115zqtoa1skjqb9))$$fc"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+      AUTH_SERVICE_URL: "http://auth_service:8002/api/auth/"
+      JWKS_SERVING_URL: "http://auth_service:8002/.well-known/jwks.json"
+      ORDER_SERVICE_URL: "http://order_service:8000/api/orders/"
+    depends_on:
+      - auth_service
+      - order_service
+    networks:
+      - ecommerce_network
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+
+networks:
+  ecommerce_network:
+    driver: bridge
