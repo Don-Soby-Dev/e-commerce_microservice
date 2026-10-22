@@ -49,19 +49,13 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           readinessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - -q
-                - ping
+            tcpSocket:
+              port: 5672
             initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - -q
-                - ping
+            tcpSocket:
+              port: 5672
             initialDelaySeconds: 25
             periodSeconds: 15
       volumes:

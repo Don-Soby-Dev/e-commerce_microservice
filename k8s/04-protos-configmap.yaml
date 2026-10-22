@@ -125,7 +125,7 @@ data:
         rpc_method_handlers = {
                 'ProcessPayment': grpc.unary_unary_rpc_method_handler(
                         servicer.ProcessPayment,
-                        request_serializer=payment__pb2.PaymentRequest.FromString,
+                        request_deserializer=payment__pb2.PaymentRequest.FromString,
                         response_serializer=payment__pb2.PaymentResponse.SerializeToString,
                 ),
         }
