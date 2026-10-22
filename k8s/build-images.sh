@@ -8,34 +8,43 @@ echo "=================================================="
 echo "📦 Building E-Commerce Microservices Docker Images"
 echo "=================================================="
 
-# Check if minikube is running; if so, point docker CLI to Minikube's daemon
+# Check if minikube is running
+IS_MINIKUBE=false
 if command -v minikube &>/dev/null && minikube status &>/dev/null; then
-    echo "💡 Minikube detected and running. Pointing Docker environment to Minikube..."
-    eval $(minikube docker-env)
-else
-    echo "ℹ️  Building images in local Docker daemon."
-    echo "   (Note: If deploying to Minikube, start it first with 'minikube start' then run this script, or run 'eval \$(minikube docker-env)' before building)"
+    IS_MINIKUBE=true
+    echo "💡 Minikube detected and running. Images will be automatically loaded into Minikube."
 fi
 
-build_image() {
-    local name="$1"
-    local dir="$2"
-    local tag="ecommerce/${name}:latest"
+SERVICES=(
+    "auth-service:services/auth_service"
+    "product-service:services/product_service"
+    "payment-service:services/payment_service"
+    "order-service:services/order_service"
+    "notification-service:services/notification_service"
+    "api-gateway:services/api_gateway"
+)
+
+for item in "${SERVICES[@]}"; do
+    IFS=":" read -r name dir <<< "$item"
+    tag="ecommerce/${name}:latest"
     echo "--------------------------------------------------"
     echo "🔨 Building ${tag} from ${dir}..."
     docker build -t "${tag}" "${ROOT_DIR}/${dir}"
-    echo "✅ Successfully built ${tag}"
-}
+    
+    if [ "$IS_MINIKUBE" = true ]; then
+        echo "📥 Loading ${tag} into Minikube..."
+        minikube image load "${tag}"
+    fi
+    echo "✅ Successfully prepared ${tag}"
+done
 
-build_image "auth-service" "services/auth_service"
-build_image "product-service" "services/product_service"
-build_image "payment-service" "services/payment_service"
-build_image "order-service" "services/order_service"
-build_image "notification-service" "services/notification_service"
-build_image "api-gateway" "services/api_gateway"
-
-echo "--------------------------------------------------"
-echo "🎉 All 6 microservice images built successfully!"
 echo "=================================================="
-echo "Available ecommerce images:"
-docker images | grep -E "^ecommerce/" || true
+echo "🎉 All 6 microservice images built and ready!"
+echo "=================================================="
+if [ "$IS_MINIKUBE" = true ]; then
+    echo "Images inside Minikube:"
+    minikube image ls | grep -E "ecommerce/(auth|product|payment|order|notification|api-gateway)" || true
+else
+    echo "Images in host Docker:"
+    docker images | grep -E "^ecommerce/" || true
+fi
