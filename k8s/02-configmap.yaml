@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-config
+  namespace: ecommerce
+data:
+  DEBUG: "True"
+  ALLOWED_HOSTS: "*"
+  DB_ENGINE: "django.db.backends.postgresql"
+  DB_USER: "postgres"
+  DB_HOST: "postgres.ecommerce.svc.cluster.local"
+  DB_PORT: "5432"
+  RABBITMQ_HOST: "rabbitmq.ecommerce.svc.cluster.local"
+  AUTH_SERVICE_URL: "http://auth-service.ecommerce.svc.cluster.local:8002/api/auth/"
+  JWKS_SERVING_URL: "http://auth-service.ecommerce.svc.cluster.local:8002/.well-known/jwks.json"
+  ORDER_SERVICE_URL: "http://order-service.ecommerce.svc.cluster.local:8000/api/orders/"
+  PRODUCT_SERVICE_URL: "http://product-service.ecommerce.svc.cluster.local:8001/api/products/"
+  PAYMENT_SERVICE_URL: "payment-service.ecommerce.svc.cluster.local:50051"
