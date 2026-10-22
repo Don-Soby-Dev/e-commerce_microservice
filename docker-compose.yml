@@ -19,6 +19,30 @@ services:
           - rabbitmq
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      ecommerce_network:
+        aliases:
+          - postgres
+    restart: unless-stopped
+
   auth-service:
     build:
       context: ./services/auth_service
@@ -26,10 +50,20 @@ services:
     container_name: auth-service
     ports:
       - "8002:8002"
+    command: [ "sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8002" ]
     environment:
       SECRET_KEY: "django-insecure-)v$$sxykalzs8pz2acd4=i!ko*49=69ehp5@e%0+rh4gqajny8&"
       DEBUG: "True"
       ALLOWED_HOSTS: "*"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "auth_db"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgrespassword"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       ecommerce_network:
         aliases:
@@ -44,10 +78,20 @@ services:
     container_name: product-service
     ports:
       - "8001:8001"
+    command: [ "sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8001" ]
     environment:
       SECRET_KEY: "django-insecure-tloo#y!v!xa@5$$^ykkf07z%#c9dwu1%fed!k^u^mt%i5xhvbp4"
       DEBUG: "True"
       ALLOWED_HOSTS: "*"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "product_db"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgrespassword"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       ecommerce_network:
         aliases:
@@ -88,7 +132,7 @@ services:
     container_name: order-service
     ports:
       - "8000:8000"
-    command: [ "python", "manage.py", "runserver", "0.0.0.0:8000" ]
+    command: [ "sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000" ]
     volumes:
       - ./protos:/protos
     environment:
@@ -98,7 +142,15 @@ services:
       PRODUCT_SERVICE_URL: "http://product-service:8001"
       PAYMENT_SERVICE_URL: "payment-service:50051"
       RABBITMQ_HOST: "rabbitmq"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "order_db"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgrespassword"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
     depends_on:
+      postgres:
+        condition: service_healthy
       product-service:
         condition: service_started
       payment-service:
@@ -161,6 +213,7 @@ services:
 
 volumes:
   rabbitmq_data:
+  postgres_data:
 
 networks:
   ecommerce_network:
