@@ -1,0 +1,116 @@
+name: CI - Quality, Tests & Manifests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches-ignore: [ main, develop ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Code Quality & Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install flake8
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+
+      - name: Lint for critical Python errors
+        run: |
+          # Stop build if there are Python syntax errors or undefined names
+          flake8 services/ --exclude=.venv,venv --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Informational style report
+        run: |
+          # Exit-zero treats warnings as non-blocking style guidance
+          flake8 services/ --exclude=.venv,venv --count --exit-zero --max-complexity=15 --max-line-length=127 --statistics
+
+  test-services:
+    name: Test ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: auth-service
+            dir: services/auth_service
+            app: auths
+            pythonpath: ""
+          - name: product-service
+            dir: services/product_service
+            app: products
+            pythonpath: ""
+          - name: order-service
+            dir: services/order_service
+            app: orders
+            pythonpath: protos
+          - name: payment-service
+            dir: services/payment_service
+            app: payments
+            pythonpath: protos
+          - name: notification-service
+            dir: services/notification_service
+            app: notifications
+            pythonpath: ""
+          - name: api-gateway
+            dir: services/api_gateway
+            app: apis
+            pythonpath: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: ${{ matrix.service.dir }}/requirements.txt
+
+      - name: Install service dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ matrix.service.dir }}/requirements.txt
+
+      - name: Execute Django Test Suite
+        env:
+          SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY || 'ci-django-insecure-test-key-safe-for-automated-tests' }}
+          DEBUG: "True"
+          ALLOWED_HOSTS: "*"
+        run: |
+          cd ${{ matrix.service.dir }}
+          if [ -n "${{ matrix.service.pythonpath }}" ]; then
+            export PYTHONPATH="${{ github.workspace }}/${{ matrix.service.pythonpath }}:${PYTHONPATH:-}"
+          fi
+          python manage.py test ${{ matrix.service.app }} --verbosity=2
+
+  k8s-validate:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Validate Kustomize Build
+        run: |
+          echo "Rendering Kustomize manifests..."
+          kubectl kustomize k8s/ > /dev/null
+          echo "✅ Kustomize rendered successfully without errors."
