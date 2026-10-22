@@ -136,3 +136,4 @@ JWKS_SERVING_URL = os.getenv(
 
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8002/api/auth/")
 ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://localhost:8000/api/orders/")
+PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://localhost:8001/api/products/")

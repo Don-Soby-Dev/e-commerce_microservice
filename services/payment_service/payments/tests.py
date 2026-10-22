@@ -1,5 +1,5 @@
 from django.test import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import sys
 from pathlib import Path
 
@@ -18,7 +18,8 @@ class PaymentServicerTestCase(TestCase):
         self.servicer = PaymentServicer()
         self.context = MagicMock()
 
-    def test_process_payment_success(self):
+    @patch("server.publish_payment_success_event")
+    def test_process_payment_success(self, mock_publish):
         request = payment_pb2.PaymentRequest(
             user_id=1,
             order_id=101,
@@ -29,6 +30,7 @@ class PaymentServicerTestCase(TestCase):
         self.assertTrue(response.success)
         self.assertTrue(response.transaction_id.startswith("tx_"))
         self.assertEqual(response.message, "Payment processed successfully")
+        mock_publish.assert_called_once_with(101, 1, 5000)
 
     def test_process_payment_invalid_amount_zero(self):
         request = payment_pb2.PaymentRequest(

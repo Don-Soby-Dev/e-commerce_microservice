@@ -30,13 +30,17 @@ class PaymentServicer(payment_pb2_grpc.PaymentServiceServicer):
             )
 
         tx_id = f"tx_{uuid.uuid4().hex[:10]}"
-        publish_payment_success_event(
-            request.order_id,
-            request.user_id,
-            request.amount,
-        )
+        try:
+            publish_payment_success_event(
+                request.order_id,
+                request.user_id,
+                request.amount,
+            )
+        except Exception as exc:
+            print(f"Warning: Failed to publish payment success event: {exc}")
+
         return payment_pb2.PaymentResponse(
-            success=True, transaction_id=tx_id, message=""
+            success=True, transaction_id=tx_id, message="Payment processed successfully"
         )
 
 

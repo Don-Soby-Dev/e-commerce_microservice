@@ -110,9 +110,12 @@ class ViewsAndUrlsTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
 
+    @patch("orders.views.PaymentTransaction")
     @patch.object(ProductServiceClient, "deduct_stock")
     @patch.object(ProductServiceClient, "get_product")
-    def test_create_order_view_success(self, mock_get_product, mock_deduct_stock):
+    def test_create_order_view_success(
+        self, mock_get_product, mock_deduct_stock, mock_payment
+    ):
         mock_get_product.return_value = {
             "id": 100,
             "name": "Keyboard",
@@ -120,6 +123,11 @@ class ViewsAndUrlsTestCase(TestCase):
             "stock": 10,
         }
         mock_deduct_stock.return_value = True
+        mock_payment.return_value = MagicMock(
+            success=True,
+            transaction_id="tx_test123",
+            message="Payment processed successfully",
+        )
 
         payload = {
             "user_id": 99,
@@ -134,10 +142,56 @@ class ViewsAndUrlsTestCase(TestCase):
         order = Order.objects.get(id=response.data["id"])
         self.assertEqual(order.user_id, 99)
         self.assertEqual(order.total_amount, Decimal("150.00"))
+        self.assertEqual(order.status, "CONFIRMED")
         self.assertEqual(order.items.count(), 1)
         item = order.items.first()
         self.assertEqual(item.unit_price, Decimal("75.00"))
         self.assertEqual(item.quantity, 2)
+
+    @patch("orders.views.PaymentTransaction")
+    @patch.object(ProductServiceClient, "get_product")
+    def test_create_order_payment_failure(self, mock_get_product, mock_payment):
+        mock_get_product.return_value = {
+            "id": 100,
+            "name": "Keyboard",
+            "price": Decimal("75.00"),
+            "stock": 10,
+        }
+        mock_payment.return_value = MagicMock(
+            success=False,
+            transaction_id="",
+            message="Insufficient funds",
+        )
+
+        payload = {
+            "user_id": 99,
+            "items": [{"product_id": 100, "quantity": 1}],
+        }
+        response = self.client.post("/api/orders/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "Insufficient funds")
+        self.assertFalse(Order.objects.filter(user_id=99).exists())
+
+    @patch("orders.views.PaymentTransaction")
+    @patch.object(ProductServiceClient, "get_product")
+    def test_create_order_grpc_error(self, mock_get_product, mock_payment):
+        import grpc
+        mock_get_product.return_value = {
+            "id": 100,
+            "name": "Keyboard",
+            "price": Decimal("75.00"),
+            "stock": 10,
+        }
+        mock_payment.side_effect = grpc.RpcError("gRPC connection failed")
+
+        payload = {
+            "user_id": 99,
+            "items": [{"product_id": 100, "quantity": 1}],
+        }
+        response = self.client.post("/api/orders/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertIn("error", response.data)
+        self.assertFalse(Order.objects.filter(user_id=99).exists())
 
     @patch.object(ProductServiceClient, "get_product")
     def test_create_order_insufficient_stock(self, mock_get_product):
@@ -193,6 +247,15 @@ class ViewsAndUrlsTestCase(TestCase):
         detail_response = self.client.get(f"/api/orders/{order.id}/")
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
         self.assertEqual(detail_response.data["user_id"], 10)
+
+    def test_list_orders_filtering_by_user_id(self):
+        Order.objects.create(user_id=10, total_amount=Decimal("50.00"))
+        Order.objects.create(user_id=20, total_amount=Decimal("70.00"))
+
+        response = self.client.get("/api/orders/?user_id=10")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["user_id"], 10)
 
 
 class ProductClientTestCase(TestCase):

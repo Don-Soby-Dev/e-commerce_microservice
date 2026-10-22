@@ -68,3 +68,7 @@ class JWTGatewayAuthenticaion(BaseAuthentication):
             )
 
         return (ServiceUser(payload), payload)
+
+
+JWTGatewayAuthentication = JWTGatewayAuthenticaion
+

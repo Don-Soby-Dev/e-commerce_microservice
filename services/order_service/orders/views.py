@@ -1,3 +1,4 @@
+import grpc
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 
@@ -16,6 +17,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     queryset = Order.objects.all().order_by("-created_at")
     serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user_id = self.request.query_params.get("user_id")
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -43,13 +51,28 @@ class OrderViewSet(viewsets.ModelViewSet):
             total_amount=total_amount,
         )
 
-        res = PaymentTransaction(user_id, order.id, int(total_amount))
-        print(
-            "Payment is processd and it is : ", res.success, "on : ", res.transaction_id
-        )
+        try:
+            res = PaymentTransaction(user_id, order.id, int(round(total_amount)))
+            print(
+                "Payment is processed and it is : ", res.success, "on : ", getattr(res, "transaction_id", "")
+            )
+        except grpc.RpcError as exc:
+            order.delete()
+            return Response(
+                {"error": f"Payment service unavailable: {exc.details() if hasattr(exc, 'details') else str(exc)}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception as exc:
+            order.delete()
+            return Response(
+                {"error": f"Payment processing error: {str(exc)}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         if not res.success:
             order.delete()
-            return Response(res.message, status=status.HTTP_400_BAD_REQUEST)
+            error_message = getattr(res, "message", None) or "Payment failed"
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
 
         deducted_items = []
         for item in processed_items:
@@ -77,6 +100,10 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return Response(error, status=status.HTTP_400_BAD_REQUEST)
 
             deducted_items.append(item)
+
+        # Mark order as CONFIRMED upon successful payment and stock deduction
+        order.status = "CONFIRMED"
+        order.save(update_fields=["status"])
 
         output_serializer = self.get_serializer(order)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)

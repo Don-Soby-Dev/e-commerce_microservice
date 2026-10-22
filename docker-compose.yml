@@ -14,14 +14,16 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - rabbitmq
     restart: unless-stopped
 
-  auth_service:
+  auth-service:
     build:
       context: ./services/auth_service
       dockerfile: Dockerfile
-    container_name: auth_service
+    container_name: auth-service
     ports:
       - "8002:8002"
     environment:
@@ -29,14 +31,17 @@ services:
       DEBUG: "True"
       ALLOWED_HOSTS: "*"
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - auth-service
+          - auth_service
     restart: unless-stopped
 
-  product_service:
+  product-service:
     build:
       context: ./services/product_service
       dockerfile: Dockerfile
-    container_name: product_service
+    container_name: product-service
     ports:
       - "8001:8001"
     environment:
@@ -44,14 +49,17 @@ services:
       DEBUG: "True"
       ALLOWED_HOSTS: "*"
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - product-service
+          - product_service
     restart: unless-stopped
 
-  payment_service:
+  payment-service:
     build:
       context: ./services/payment_service
       dockerfile: Dockerfile
-    container_name: payment_service
+    container_name: payment-service
     ports:
       - "50051:50051"
     command: [ "python", "server.py" ]
@@ -67,41 +75,48 @@ services:
       rabbitmq:
         condition: service_healthy
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - payment-service
+          - payment_service
     restart: unless-stopped
 
-  order_service:
+  order-service:
     build:
       context: ./services/order_service
       dockerfile: Dockerfile
-    container_name: order_service
+    container_name: order-service
     ports:
       - "8000:8000"
+    command: [ "python", "manage.py", "runserver", "0.0.0.0:8000" ]
     volumes:
       - ./protos:/protos
     environment:
       SECRET_KEY: "django-insecure-j++mi!shz$$eu&p1j9s0i5a1&cic_68dshq5_4^g#-_*=lqq-qs"
       DEBUG: "True"
       ALLOWED_HOSTS: "*"
-      PRODUCT_SERVICE_URL: "http://product_service:8001"
-      PAYMENT_SERVICE_URL: "payment_service:50051"
+      PRODUCT_SERVICE_URL: "http://product-service:8001"
+      PAYMENT_SERVICE_URL: "payment-service:50051"
       RABBITMQ_HOST: "rabbitmq"
     depends_on:
-      product_service:
+      product-service:
         condition: service_started
-      payment_service:
+      payment-service:
         condition: service_started
       rabbitmq:
         condition: service_healthy
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - order-service
+          - order_service
     restart: unless-stopped
 
-  notification_service:
+  notification-service:
     build:
       context: ./services/notification_service
       dockerfile: Dockerfile
-    container_name: notification_service
+    container_name: notification-service
     command: [ "python", "notifications/consumer.py" ]
     environment:
       RABBITMQ_HOST: "rabbitmq"
@@ -109,28 +124,39 @@ services:
       rabbitmq:
         condition: service_healthy
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - notification-service
+          - notification_service
     restart: unless-stopped
 
-  api_gateway:
+  api-gateway:
     build:
       context: ./services/api_gateway
       dockerfile: Dockerfile
-    container_name: api_gateway
+    container_name: api-gateway
     ports:
       - "8003:8003"
     environment:
       SECRET_KEY: "django-insecure-6*=-gqhz%&u4t4tbb8-kx+(!01bkl8115zqtoa1skjqb9))$$fc"
       DEBUG: "True"
       ALLOWED_HOSTS: "*"
-      AUTH_SERVICE_URL: "http://auth_service:8002/api/auth/"
-      JWKS_SERVING_URL: "http://auth_service:8002/.well-known/jwks.json"
-      ORDER_SERVICE_URL: "http://order_service:8000/api/orders/"
+      AUTH_SERVICE_URL: "http://auth-service:8002/api/auth/"
+      JWKS_SERVING_URL: "http://auth-service:8002/.well-known/jwks.json"
+      ORDER_SERVICE_URL: "http://order-service:8000/api/orders/"
+      PRODUCT_SERVICE_URL: "http://product-service:8001/api/products/"
     depends_on:
-      - auth_service
-      - order_service
+      auth-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      product-service:
+        condition: service_started
     networks:
-      - ecommerce_network
+      ecommerce_network:
+        aliases:
+          - api-gateway
+          - api_gateway
     restart: unless-stopped
 
 volumes:
