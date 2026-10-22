@@ -59,6 +59,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r ${{ matrix.service.dir }}/requirements.txt
 
+      - name: Generate Auth Service Certs (if needed)
+        if: matrix.service.name == 'auth-service'
+        run: |
+          mkdir -p services/auth_service/certs
+          openssl genrsa -out services/auth_service/certs/private_key.pem 2048
+          openssl rsa -in services/auth_service/certs/private_key.pem -pubout -out services/auth_service/certs/public_key.pem
+
       - name: Run service unit tests
         env:
           SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY || 'ci-django-insecure-test-key-safe-for-automated-tests' }}

@@ -147,11 +147,34 @@ MAILERS = {
     },
 }
 
-with open(BASE_DIR / "certs" / "public_key.pem", "r") as f:
-    PUBLIC_KEY = f.read()
+# RSA Keypair for JWT Signing and JWKS
+PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY")
+PRIVATE_KEY = os.getenv("JWT_PRIVATE_KEY")
 
-with open(BASE_DIR / "certs" / "private_key.pem", "r") as f:
-    PRIVATE_KEY = f.read()
+pub_key_path = BASE_DIR / "certs" / "public_key.pem"
+priv_key_path = BASE_DIR / "certs" / "private_key.pem"
+
+if not PUBLIC_KEY or not PRIVATE_KEY:
+    if pub_key_path.exists() and priv_key_path.exists():
+        with open(pub_key_path, "r") as f:
+            PUBLIC_KEY = f.read()
+        with open(priv_key_path, "r") as f:
+            PRIVATE_KEY = f.read()
+    else:
+        # Graceful fallback for CI / ephemeral test environments without mounted certs
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+
+        _ephemeral_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        PRIVATE_KEY = _ephemeral_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode("utf-8")
+        PUBLIC_KEY = _ephemeral_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode("utf-8")
 
 
 REST_FRAMEWORK = {
